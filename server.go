@@ -14,13 +14,15 @@ import (
 
 var uPnPAddress = "239.255.255.250:1900"
 
-type WegoServer struct {
+// VwegoServer is the virtual we go server struct
+type VwegoServer struct {
 	ServerIP   string
 	ConfigPath string
 	NatsServer *embednats.Server
 	Config     *DeviceConfig
 }
 
+// DeviceConfig is the format of the configuration file
 type DeviceConfig struct {
 	Devices []*Device
 }
@@ -37,7 +39,7 @@ func listenUPnP() (conn *net.UDPConn, err error) {
 	return conn, err
 }
 
-func (s *WegoServer) ListenForDiscoveryPackets() (listener func(), err error) {
+func (s *VwegoServer) createDiscoveryListener() (listener func(), err error) {
 
 	conn, err := listenUPnP()
 	if err != nil {
@@ -51,10 +53,7 @@ func (s *WegoServer) ListenForDiscoveryPackets() (listener func(), err error) {
 			if err != nil {
 				continue
 			}
-			dr, err := protocol.ParseDiscoveryRequest(buf[:packetLength])
-			if err != nil {
-				continue
-			}
+			dr := protocol.ParseDiscoveryRequest(buf[:packetLength])
 
 			if dr.IsDeviceRequest() {
 				dr.RemoteHost = remote.String()
@@ -69,7 +68,7 @@ func (s *WegoServer) ListenForDiscoveryPackets() (listener func(), err error) {
 	return listener, nil
 }
 
-func (s *WegoServer) LogMessages() {
+func (s *VwegoServer) logMessages() {
 	nc, err := s.NatsServer.Connect()
 	if err != nil {
 		log.Println("unable to connect")
@@ -87,12 +86,12 @@ func (s *WegoServer) LogMessages() {
 	}
 }
 
-func (s *WegoServer) Run() {
+func (s *VwegoServer) Run() {
 	log.SetOutput(os.Stdout)
 
 	s.NatsServer = embednats.NewServer(s.ServerIP)
 
-	go s.LogMessages()
+	go s.logMessages()
 
 	err := s.ReadConfig()
 	if err != nil {
@@ -103,14 +102,14 @@ func (s *WegoServer) Run() {
 		go device.StartServer(s)
 	}
 
-	listener, err := s.ListenForDiscoveryPackets()
+	listener, err := s.createDiscoveryListener()
 	if err != nil {
 		panic(err)
 	}
 	listener()
 }
 
-func (s *WegoServer) EncodedConnection() (ec *nats.EncodedConn, err error) {
+func (s *VwegoServer) EncodedConnection() (ec *nats.EncodedConn, err error) {
 	nc, err := s.NatsServer.Connect()
 	if err != nil {
 		return nil, err
@@ -122,7 +121,7 @@ func (s *WegoServer) EncodedConnection() (ec *nats.EncodedConn, err error) {
 	return ec, nil
 }
 
-func (s *WegoServer) ReadConfig() error {
+func (s *VwegoServer) ReadConfig() error {
 	f, err := os.Open(s.ConfigPath)
 	if err != nil {
 		return err

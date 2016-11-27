@@ -18,7 +18,7 @@ func main() {
 		log.Fatal("need to specify a serverIP parameter")
 	}
 
-	s := &vwego.WegoServer{ServerIP: *serverIP, ConfigPath: *config}
+	s := &vwego.VwegoServer{ServerIP: *serverIP, ConfigPath: *config}
 	s.Run()
 
 }

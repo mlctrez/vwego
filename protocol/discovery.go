@@ -20,11 +20,12 @@ func trimQuotes(input string) string {
 	return strings.TrimLeft(strings.TrimRight(input, "\""), "\"")
 }
 
+// IsDeviceRequest returns true if the ST urn maps to a Belkin device
 func (dp *DiscoveryRequest) IsDeviceRequest() bool {
 	return "urn:Belkin:device:**" == dp.St
 }
 
-func (dp *DiscoveryRequest) ParseLine(line string) {
+func (dp *DiscoveryRequest) parseLine(line string) {
 	if strings.Contains(line, "M-SEARCH *") {
 		dp.Action = line
 	} else if strings.Contains(line, ":") {
@@ -47,7 +48,8 @@ func (dp *DiscoveryRequest) ParseLine(line string) {
 	}
 }
 
-func ParseDiscoveryRequest(packet []byte) (req *DiscoveryRequest, err error) {
+// ParseDiscoveryRequest parses a uPnP discovery packet into a DiscoveryRequest
+func ParseDiscoveryRequest(packet []byte) (req *DiscoveryRequest) {
 	req = &DiscoveryRequest{}
 
 	buf := &bytes.Buffer{}
@@ -56,16 +58,17 @@ func ParseDiscoveryRequest(packet []byte) (req *DiscoveryRequest, err error) {
 		case 13:
 		// does nothing
 		case 10:
-			req.ParseLine(string(buf.Bytes()))
+			req.parseLine(string(buf.Bytes()))
 			buf.Reset()
 			continue
 		default:
 			buf.WriteByte(b)
 		}
 	}
-	return req, nil
+	return req
 }
 
+// DiscoveryResponseParams is the parameters for the discovery response template
 type DiscoveryResponseParams struct {
 	DeviceName string
 	ServerIP   string
@@ -90,7 +93,8 @@ USN: uuid:Socket-1_0-{{.UU}}::urn:Belkin:device:**
 `
 var drTemplate = template.Must(template.New("d").Parse(drTemplateText))
 
-func DiscoveryResponse(parms *DiscoveryResponseParams) []byte {
+// BuildDiscoveryResponse creates the response packet to a discovery request
+func BuildDiscoveryResponse(parms *DiscoveryResponseParams) []byte {
 
 	parms.Date = time.Now().UTC().Format(time.RFC1123)
 

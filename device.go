@@ -11,12 +11,12 @@ import (
 )
 
 type Device struct {
-	fauxServer *WegoServer
-	natsConn   *nats.EncodedConn
-	UUID       string
-	UU         string
-	Name       string
-	Port       int
+	vServer  *VwegoServer
+	natsConn *nats.EncodedConn
+	UUID     string
+	UU       string
+	Name     string
+	Port     int
 }
 
 type DeviceEvent struct {
@@ -25,22 +25,15 @@ type DeviceEvent struct {
 	Command string
 }
 
-//type DeviceHttpRequest struct {
-//	UUID       string
-//	Name       string
-//	URL        string
-//	RemoteAddr string
-//}
-
 type LogData map[string]interface{}
 
-func (d *Device) StartServer(fauxServer *WegoServer) {
+func (d *Device) StartServer(vServer *VwegoServer) {
 
-	d.fauxServer = fauxServer
+	d.vServer = vServer
 
 	d.connectNats()
 
-	server := &http.Server{Addr: fmt.Sprintf("%s:%d", d.fauxServer.ServerIP, d.Port), Handler: d}
+	server := &http.Server{Addr: fmt.Sprintf("%s:%d", d.vServer.ServerIP, d.Port), Handler: d}
 
 	d.Debug(&LogData{"msg": "starting server", "addr": server.Addr, "name": d.Name})
 
@@ -57,7 +50,7 @@ func (d *Device) DiscoveryRequest(m *protocol.DiscoveryRequest) {
 }
 
 func (d *Device) connectNats() {
-	c, err := d.fauxServer.EncodedConnection()
+	c, err := d.vServer.EncodedConnection()
 	if err != nil {
 		log.Println("error connecting to nats server", err)
 		return
@@ -120,13 +113,13 @@ func (d *Device) SendDiscoveryResponse(remoteAddress *net.UDPAddr) {
 
 	parms := &protocol.DiscoveryResponseParams{
 		DeviceName: d.Name,
-		ServerIP:   d.fauxServer.ServerIP,
+		ServerIP:   d.vServer.ServerIP,
 		ServerPort: d.Port,
 		UUID:       d.UUID,
 		UU:         d.UU,
 	}
 
-	drBytes := protocol.DiscoveryResponse(parms)
+	drBytes := protocol.BuildDiscoveryResponse(parms)
 	d.Debug(&LogData{"DiscoveryResponseParams": parms})
 	con.Write(drBytes)
 }
