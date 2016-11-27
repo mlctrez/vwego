@@ -1,4 +1,5 @@
 {
+  "NatsPort": 10999,
   "Devices": [
     {
       "UUID": "079236fe-8485-44db-b3cb-a7cf5930cd34",

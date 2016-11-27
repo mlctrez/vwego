@@ -2,14 +2,16 @@ package vwego
 
 import (
 	"encoding/json"
-	"github.com/mlctrez/vwego/embednats"
+	"fmt"
 	"github.com/mlctrez/vwego/protocol"
+	"github.com/nats-io/gnatsd/server"
 	"github.com/nats-io/nats"
 	"github.com/satori/go.uuid"
 	"log"
 	"net"
 	"os"
 	"strings"
+	"time"
 )
 
 var uPnPAddress = "239.255.255.250:1900"
@@ -18,13 +20,15 @@ var uPnPAddress = "239.255.255.250:1900"
 type VwegoServer struct {
 	ServerIP   string
 	ConfigPath string
-	NatsServer *embednats.Server
-	Config     *DeviceConfig
+	NatsServer *server.Server
+	EncConn    *nats.EncodedConn
+	Config     *VwegoConfig
 }
 
 // DeviceConfig is the format of the configuration file
-type DeviceConfig struct {
-	Devices []*Device
+type VwegoConfig struct {
+	NatsPort int
+	Devices  []*Device
 }
 
 func listenUPnP() (conn *net.UDPConn, err error) {
@@ -57,19 +61,25 @@ func (s *VwegoServer) createDiscoveryListener() (listener func(), err error) {
 
 			if dr.IsDeviceRequest() {
 				dr.RemoteHost = remote.String()
-				dj, err := json.Marshal(dr)
-				if err != nil {
-					continue
-				}
-				s.NatsServer.Publish("protocol.DiscoveryRequest", dj)
+				s.EncConn.Publish("protocol.DiscoveryRequest", dr)
 			}
 		}
 	}
 	return listener, nil
 }
 
+func (s *VwegoServer) natsUrl() string {
+	return fmt.Sprintf("nats://%s:%d", s.ServerIP, s.Config.NatsPort)
+}
+
+func (s *VwegoServer) connectNats() (*nats.Conn, error) {
+	opts := nats.DefaultOptions
+	opts.Servers = []string{s.natsUrl()}
+	return opts.Connect()
+}
+
 func (s *VwegoServer) logMessages() {
-	nc, err := s.NatsServer.Connect()
+	nc, err := s.connectNats()
 	if err != nil {
 		log.Println("unable to connect")
 		return
@@ -86,17 +96,53 @@ func (s *VwegoServer) logMessages() {
 	}
 }
 
+func (s *VwegoServer) startNats() {
+	natsOptions := &server.Options{
+		Host: s.ServerIP,
+		Port: s.Config.NatsPort,
+	}
+
+	s.NatsServer = server.New(natsOptions)
+
+	go s.NatsServer.Start()
+
+	// follows https://github.com/nats-io/gnatsd/blob/master/test/test.go#L84
+	end := time.Now().Add(2 * time.Second)
+	for time.Now().Before(end) {
+		addr := s.NatsServer.GetListenEndpoint()
+		if addr == "" {
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		conn, err := net.Dial("tcp", addr)
+		if err != nil {
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		conn.Close()
+		time.Sleep(25 * time.Millisecond)
+		return
+	}
+	panic("unable to start nats server")
+}
+
 func (s *VwegoServer) Run() {
 	log.SetOutput(os.Stdout)
-
-	s.NatsServer = embednats.NewServer(s.ServerIP)
-
-	go s.logMessages()
 
 	err := s.ReadConfig()
 	if err != nil {
 		panic(err)
 	}
+
+	s.startNats()
+
+	enccon, err := s.EncodedConnection()
+	if err != nil {
+		panic(err)
+	}
+	s.EncConn = enccon
+
+	go s.logMessages()
 
 	for _, device := range s.Config.Devices {
 		go device.StartServer(s)
@@ -110,7 +156,7 @@ func (s *VwegoServer) Run() {
 }
 
 func (s *VwegoServer) EncodedConnection() (ec *nats.EncodedConn, err error) {
-	nc, err := s.NatsServer.Connect()
+	nc, err := s.connectNats()
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +172,7 @@ func (s *VwegoServer) ReadConfig() error {
 	if err != nil {
 		return err
 	}
-	srv := &DeviceConfig{}
+	srv := &VwegoConfig{}
 	err = json.NewDecoder(f).Decode(srv)
 	if err != nil {
 		return err
@@ -136,7 +182,7 @@ func (s *VwegoServer) ReadConfig() error {
 }
 
 func CreateConfig(devices []string, path string) error {
-	d := &DeviceConfig{Devices: make([]*Device, 0)}
+	d := &VwegoConfig{Devices: make([]*Device, 0)}
 	for idx, name := range devices {
 		u := uuid.NewV4()
 		uParts := strings.Split(u.String(), "-")
@@ -152,7 +198,7 @@ func CreateConfig(devices []string, path string) error {
 	return d.SaveConfig(path)
 }
 
-func (srv *DeviceConfig) SaveConfig(path string) error {
+func (srv *VwegoConfig) SaveConfig(path string) error {
 
 	f, err := os.Create(path)
 	if err != nil {
