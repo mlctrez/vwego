@@ -1,0 +1,50 @@
+
+
+# UPnP discovery UDP packet
+M-SEARCH * HTTP/1.1
+HOST: 239.255.255.250:1900
+MAN: "ssdp:discover"
+MX: 15
+ST: urn:Belkin:device:**
+
+
+# UPnP discovery response UDP packet
+HTTP/1.1 200 OK
+CACHE-CONTROL: max-age=86400
+DATE: {{.Date}}
+EXT:
+LOCATION: http://{{.ServerIP}}:{{.ServerPort}}/settings.xml
+OPT: "http://schemas.upnp.org/upnp/1/0/"; ns=01
+01-NLS: {{.UUID}}
+SERVER: Unspecified, UPnP/1.0, Unspecified
+X-User-Agent: redsonic
+ST: urn:Belkin:device:**
+USN: uuid:Socket-1_0-{{.UU}}::urn:Belkin:device:**
+
+
+# xml response payload for /settings.xml
+
+<?xml version="1.0"?>
+<root>
+  <device>
+    <deviceType>urn:MakerMusings:device:controllee:1</deviceType>
+    <friendlyName>@@DEVICE_NAME@@</friendlyName>
+    <manufacturer>Belkin International Inc.</manufacturer>
+    <modelName>Emulated Socket</modelName>
+    <modelNumber>3.14159</modelNumber>
+    <UDN>uuid:Socket-1_0-@@DEVICE_UU@@</UDN>
+  </device>
+</root>
+
+
+
+# xml payload sent to /upnp/control/basicevent1
+
+<?xml version="1.0" encoding="utf-8"?>
+<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+    <s:Body>
+        <u:SetBinaryState xmlns:u="urn:Belkin:service:basicevent:1">
+            <BinaryState>1</BinaryState>
+        </u:SetBinaryState>
+    </s:Body>
+</s:Envelope>

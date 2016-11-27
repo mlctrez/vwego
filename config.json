@@ -1,0 +1,22 @@
+{
+  "Devices": [
+    {
+      "UUID": "079236fe-8485-44db-b3cb-a7cf5930cd34",
+      "UU": "a7cf5930cd34",
+      "Name": "television",
+      "Port": 11000
+    },
+    {
+      "UUID": "5498136c-b47a-4cef-9f56-218e16a9999c",
+      "UU": "218e16a9999c",
+      "Name": "garage",
+      "Port":  11001
+    },
+    {
+      "UUID": "c4b5d4d7-6066-4dd8-8ab1-f24833496367",
+      "UU": "f24833496367",
+      "Name": "kitchen",
+      "Port": 11002
+    }
+  ]
+}
