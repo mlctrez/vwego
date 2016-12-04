@@ -2,16 +2,28 @@
 
 set -x
 
-echo "environment"
+GOPATH=`mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir'`
+export GOPATH
 
-env
+go get github.com/nats-io/gnatsd/
+go get github.com/nats-io/nats/
+go get github.com/satori/go.uuid
 
-echo "current directory"
+mkdir -p $GOPATH/src/github.com/mlctrez
 
-pwd
+ln -s `pwd` $GOPATH/src/github.com/mlctrez/vwego
 
-echo "current files"
+go build -o vw vwego/vwego.go
 
-ls -l
+echo $GOPATH
+
+rm -rf $GOPATH
+
+
+
+
+
+
+
 
 
