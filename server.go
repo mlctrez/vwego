@@ -3,6 +3,7 @@ package vwego
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/mlctrez/vwego/logzio"
 	"github.com/mlctrez/vwego/protocol"
 	"github.com/nats-io/gnatsd/server"
 	"github.com/nats-io/nats"
@@ -27,8 +28,9 @@ type VwegoServer struct {
 
 // DeviceConfig is the format of the configuration file
 type VwegoConfig struct {
-	NatsPort int
-	Devices  []*Device
+	NatsPort    int
+	LogzIOToken string
+	Devices     []*Device
 }
 
 func listenUPnP() (conn *net.UDPConn, err error) {
@@ -78,7 +80,7 @@ func (s *VwegoServer) connectNats() (*nats.Conn, error) {
 	return opts.Connect()
 }
 
-func (s *VwegoServer) logMessages() {
+func (s *VwegoServer) logMessages(lc *logzio.LogContext) {
 	nc, err := s.connectNats()
 	if err != nil {
 		log.Println("unable to connect")
@@ -91,6 +93,18 @@ func (s *VwegoServer) logMessages() {
 	for !nc.IsClosed() {
 		select {
 		case m := <-cb:
+
+			if true {
+				lc.Message(string(m.Data))
+			} else {
+				msgmap := make(map[string]interface{})
+				err := json.Unmarshal(m.Data, &msgmap)
+				if err != nil {
+					lc.Message(string(m.Data))
+				} else {
+					lc.Message(msgmap)
+				}
+			}
 			log.Println(m.Subject, string(m.Data))
 		}
 	}
@@ -142,7 +156,12 @@ func (s *VwegoServer) Run() {
 	}
 	s.EncConn = enccon
 
-	go s.logMessages()
+	lc, err := logzio.NewLogContext(s.Config.LogzIOToken)
+	if err != nil {
+		panic(err)
+	}
+
+	go s.logMessages(lc)
 
 	for _, device := range s.Config.Devices {
 		go device.StartServer(s)
