@@ -60,6 +60,7 @@ func (s *VwegoServer) createDiscoveryListener() (listener func(), err error) {
 				continue
 			}
 			dr := protocol.ParseDiscoveryRequest(buf[:packetLength])
+			dr.RemoteHost = remote.String()
 
 			if dr.IsDeviceRequest() {
 				dr.RemoteHost = remote.String()
